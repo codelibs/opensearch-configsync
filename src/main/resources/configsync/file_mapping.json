@@ -1,0 +1,15 @@
+{
+  "file": {
+    "properties": {
+      "path": {
+        "type": "keyword"
+      },
+      "content": {
+        "type": "binary"
+      },
+      "@timestamp": {
+        "type": "date"
+      }
+    }
+  }
+}
