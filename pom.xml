@@ -27,11 +27,11 @@
 		<version>9</version>
 	</parent>
 	<properties>
-		<opensearch.version>1.2.0</opensearch.version>
-		<opensearch.runner.version>1.2.0.0</opensearch.runner.version>
+		<opensearch.version>1.2.3</opensearch.version>
+		<opensearch.runner.version>1.2.3.0</opensearch.runner.version>
 		<opensearch.plugin.classname>org.codelibs.opensearch.configsync.ConfigSyncPlugin</opensearch.plugin.classname>
 		<maven.compiler.target>11</maven.compiler.target>
-		<log4j.version>2.11.1</log4j.version>
+		<log4j.version>2.17.0</log4j.version>
 	</properties>
 	<build>
 		<resources>
