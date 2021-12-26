@@ -24,6 +24,8 @@ import junit.framework.TestCase;
 
 public class ConfigSyncPluginTest extends TestCase {
 
+    private static final String INDEX_NAME = "configsync";
+
     private OpenSearchRunner runner;
 
     private int numOfNode = 3;
@@ -58,7 +60,7 @@ public class ConfigSyncPluginTest extends TestCase {
         configFiles = null;
 
         for (int i = 0; i < 10; i++) {
-            if (runner.indexExists(".configsync")) {
+            if (runner.indexExists(INDEX_NAME)) {
                 break;
             }
             try {

@@ -37,6 +37,8 @@ import org.opensearch.OpenSearchException;
 import org.opensearch.action.ActionListener;
 import org.opensearch.action.ActionResponse;
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse;
+import org.opensearch.action.bulk.BulkRequestBuilder;
+import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
@@ -96,10 +98,10 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
     public static final Setting<String> CONFIG_PATH_SETTING = Setting.simpleString("configsync.config_path", Property.NodeScope);
 
     public static final Setting<String> INDEX_SETTING =
-            new Setting<>("configsync.index", s -> ".configsync", Function.identity(), Property.NodeScope);
+            new Setting<>("configsync.index", s -> "configsync", Function.identity(), Property.NodeScope);
 
     public static final Setting<String> TYPE_SETTING =
-            new Setting<>("configsync.type", s -> "file", Function.identity(), Property.NodeScope);
+            new Setting<>("configsync.type", s -> "_doc", Function.identity(), Property.NodeScope);
 
     public static final Setting<String> XPACK_SECURITY_SETTING =
             new Setting<>("configsync.xpack.security.user", s -> "", ConfigSyncService::xpackSecurityToken, Property.NodeScope);
@@ -243,7 +245,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
                     logger.info("ConfigFileUpdater is started at {} intervals.", time);
                 }
             }, e -> {
-                logger.warn("Could not create .configsync. Retrying to start it.", e);
+                logger.warn("Could not create {}. Retrying to start it.", index, e);
                 threadPool.schedule(() -> waitForClusterReady(), TimeValue.timeValueSeconds(15), Names.GENERIC);
             }));
         }, e -> {
@@ -292,8 +294,72 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
     }
 
     private void waitForIndex(final ActionListener<ActionResponse> listener) {
-        client.admin().cluster().prepareHealth(index).setWaitForYellowStatus()
-                .execute(wrap(response -> listener.onResponse(response), listener::onFailure));
+        client.admin().cluster().prepareHealth(index).setWaitForYellowStatus().execute(wrap(response -> {
+            listener.onResponse(response);
+            migrateFromOldIndex();
+        }, listener::onFailure));
+    }
+
+    private void migrateFromOldIndex() {
+        final String oldIndex = ".configsync";
+        client().admin().indices().prepareExists(oldIndex).execute(wrap(response -> {
+            if (response.isExists()) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("{} exists.", oldIndex);
+                }
+                copyIndex(client(), oldIndex, index);
+            } else {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("{} does not exist.", oldIndex);
+                }
+            }
+        }, e -> {
+            if (e instanceof IndexNotFoundException) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("{} does not exist.", oldIndex);
+                }
+            } else {
+                logger.debug("Failed to check if {} exists.", oldIndex, e);
+            }
+        }));
+    }
+
+    private static void copyIndex(final Client client, final String oldIndex, final String newIndex) {
+        logger.info("Copy from {} to {}", oldIndex, newIndex);
+        final String timeout = "1m";
+        SearchResponse searchResponse = client.prepareSearch(oldIndex).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(timeout);
+        String scrollId = searchResponse.getScrollId();
+        try {
+            while (scrollId != null) {
+                final SearchHits searchHits = searchResponse.getHits();
+                final SearchHit[] hits = searchHits.getHits();
+                if (hits.length == 0) {
+                    break;
+                }
+
+                final BulkRequestBuilder bulkRequest = client.prepareBulk();
+                for (final SearchHit hit : hits) {
+                    bulkRequest.add(client.prepareIndex().setIndex(newIndex).setId(hit.getId()).setSource(hit.getSourceRef()));
+                }
+
+                BulkResponse bulkResponse = bulkRequest.execute().actionGet(timeout);
+                if (bulkResponse.hasFailures()) {
+                    logger.warn(bulkResponse.buildFailureMessage());
+                }
+
+                searchResponse = client.prepareSearchScroll(scrollId).setScroll(timeout).execute().actionGet(timeout);
+                if (!scrollId.equals(searchResponse.getScrollId())) {
+                    client.prepareClearScroll().addScrollId(scrollId)
+                            .execute(wrap(res -> {}, e -> logger.warn("Failed to clear the scroll context.", e)));
+                }
+                scrollId = searchResponse.getScrollId();
+            }
+        } finally {
+            if (scrollId != null) {
+                client.prepareClearScroll().addScrollId(scrollId)
+                        .execute(wrap(res -> {}, e -> logger.warn("Failed to clear the scroll context.", e)));
+            }
+        }
     }
 
     @Override
