@@ -16,7 +16,7 @@ Please file an [issue](https://github.com/codelibs/opensearch-configsync/issues 
 
 ## Installation
 
-    $ $OPENSEARCH_HOME/bin/opensearch-plugin install org.codelibs:opensearch-configsync:1.1.0
+    $ $OPENSEARCH_HOME/bin/opensearch-plugin install org.codelibs.opensearch:opensearch-configsync:1.2.0
 
 ## Getting Started
 
