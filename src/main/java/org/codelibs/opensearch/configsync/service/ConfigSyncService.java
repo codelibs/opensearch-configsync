@@ -327,7 +327,8 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
     private static void copyIndex(final Client client, final String oldIndex, final String newIndex) {
         logger.info("Copy from {} to {}", oldIndex, newIndex);
         final String timeout = "1m";
-        SearchResponse searchResponse = client.prepareSearch(oldIndex).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(timeout);
+        SearchResponse searchResponse =
+                client.prepareSearch(oldIndex).setScroll(timeout).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(timeout);
         String scrollId = searchResponse.getScrollId();
         try {
             while (scrollId != null) {
@@ -339,7 +340,9 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
 
                 final BulkRequestBuilder bulkRequest = client.prepareBulk();
                 for (final SearchHit hit : hits) {
-                    bulkRequest.add(client.prepareIndex().setIndex(newIndex).setId(hit.getId()).setSource(hit.getSourceRef()));
+                    bulkRequest.add(
+                            client.prepareIndex().setIndex(newIndex).setId(hit.getId()).setSource(hit.getSourceRef(), XContentType.JSON));
+                    logger.info("Copying id:{}", hit.getId());
                 }
 
                 BulkResponse bulkResponse = bulkRequest.execute().actionGet(timeout);
@@ -354,6 +357,8 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
                 }
                 scrollId = searchResponse.getScrollId();
             }
+        } catch (Exception e) {
+            logger.warn("Failed to copy from {} to {}.", oldIndex, newIndex, e);
         } finally {
             if (scrollId != null) {
                 client.prepareClearScroll().addScrollId(scrollId)
