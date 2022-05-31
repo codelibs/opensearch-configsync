@@ -76,7 +76,6 @@ public class ConfigSyncPlugin extends Plugin implements ActionPlugin, SystemInde
     public List<Setting<?>> getSettings() {
         return Arrays.asList(//
                 ConfigSyncService.INDEX_SETTING, //
-                ConfigSyncService.TYPE_SETTING, //
                 ConfigSyncService.XPACK_SECURITY_SETTING, //
                 ConfigSyncService.CONFIG_PATH_SETTING, //
                 ConfigSyncService.SCROLL_TIME_SETTING, //

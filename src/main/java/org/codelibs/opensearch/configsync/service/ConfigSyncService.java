@@ -100,9 +100,6 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
     public static final Setting<String> INDEX_SETTING =
             new Setting<>("configsync.index", s -> "configsync", Function.identity(), Property.NodeScope);
 
-    public static final Setting<String> TYPE_SETTING =
-            new Setting<>("configsync.type", s -> "_doc", Function.identity(), Property.NodeScope);
-
     public static final Setting<String> XPACK_SECURITY_SETTING =
             new Setting<>("configsync.xpack.security.user", s -> "", ConfigSyncService::xpackSecurityToken, Property.NodeScope);
 
@@ -121,8 +118,6 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
     private final Client client;
 
     private final String index;
-
-    private final String type;
 
     private String configPath;
 
@@ -170,7 +165,6 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         }
 
         index = INDEX_SETTING.get(settings);
-        type = TYPE_SETTING.get(settings);
         configPath = CONFIG_PATH_SETTING.get(settings);
         if (configPath.length() == 0) {
             configPath = env.configFile().toFile().getAbsolutePath();
@@ -286,7 +280,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
                     .endObject()//
                     .endObject();
             client().admin().indices().prepareCreate(index).setSettings(settingsBuilder)
-                    .addMapping(type, source, XContentType.JSON)
+                    .setMapping(source)
                     .execute(wrap(response -> waitForIndex(listener), listener::onFailure));
         } catch (final IOException e) {
             listener.onFailure(e);
@@ -388,7 +382,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
                 builder.field(CONTENT, contentArray);
                 builder.field(TIMESTAMP, new Date());
                 builder.endObject();
-                client().prepareIndex(index, type, id).setSource(builder).setRefreshPolicy(RefreshPolicy.IMMEDIATE).execute(listener);
+                client().prepareIndex(index).setId(id).setSource(builder).setRefreshPolicy(RefreshPolicy.IMMEDIATE).execute(listener);
             } catch (final IOException e) {
                 throw new OpenSearchException("Failed to register " + path, e);
             }
@@ -529,7 +523,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
 
     public void getContent(final String path, final ActionListener<byte[]> listener) {
         checkIfIndexExists(wrap(res -> {
-            client().prepareGet(index, type, getId(path)).execute(wrap(response -> {
+            client().prepareGet(index, getId(path)).execute(wrap(response -> {
                 if (response.isExists()) {
                     final byte[] configContent = Base64.decodeBase64((String) response.getSource().get(ConfigSyncService.CONTENT));
                     listener.onResponse(configContent);
@@ -542,7 +536,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
 
     public void delete(final String path, final ActionListener<DeleteResponse> listener) {
         checkIfIndexExists(
-                wrap(response -> client().prepareDelete(index, type, getId(path)).setRefreshPolicy(RefreshPolicy.IMMEDIATE).execute(listener),
+                wrap(response -> client().prepareDelete(index, getId(path)).setRefreshPolicy(RefreshPolicy.IMMEDIATE).execute(listener),
                         listener::onFailure));
     }
 

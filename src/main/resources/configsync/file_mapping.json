@@ -1,15 +1,13 @@
 {
-  "_doc": {
-    "properties": {
-      "path": {
-        "type": "keyword"
-      },
-      "content": {
-        "type": "binary"
-      },
-      "@timestamp": {
-        "type": "date"
-      }
+  "properties": {
+    "path": {
+      "type": "keyword"
+    },
+    "content": {
+      "type": "binary"
+    },
+    "@timestamp": {
+      "type": "date"
     }
   }
 }
