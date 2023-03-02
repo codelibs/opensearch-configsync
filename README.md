@@ -1,4 +1,5 @@
 OpenSearch Config Sync Plugin
+[![Java CI with Maven](https://github.com/codelibs/opensearch-configsync/actions/workflows/maven.yml/badge.svg)](https://github.com/codelibs/opensearch-configsync/actions/workflows/maven.yml)
 =======================
 
 ## Overview
