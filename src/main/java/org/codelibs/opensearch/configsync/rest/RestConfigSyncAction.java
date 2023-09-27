@@ -1,6 +1,6 @@
 package org.codelibs.opensearch.configsync.rest;
 
-import static org.opensearch.rest.RestStatus.OK;
+import static org.opensearch.core.rest.RestStatus.OK;
 
 import java.io.IOException;
 import java.util.Map;

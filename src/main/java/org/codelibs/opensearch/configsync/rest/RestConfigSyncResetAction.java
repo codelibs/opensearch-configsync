@@ -2,7 +2,7 @@ package org.codelibs.opensearch.configsync.rest;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableList;
-import static org.opensearch.action.ActionListener.wrap;
+import static org.opensearch.core.action.ActionListener.wrap;
 import static org.opensearch.rest.RestRequest.Method.POST;
 
 import java.io.IOException;
