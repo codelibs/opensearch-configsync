@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2025 CodeLibs Project and the Others.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
 package org.codelibs.opensearch.configsync.service;
 
 import static org.opensearch.core.action.ActionListener.wrap;
@@ -41,8 +56,7 @@ import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.WriteRequest.RefreshPolicy;
-import org.opensearch.action.support.master.AcknowledgedResponse;
-import org.opensearch.client.Client;
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.health.ClusterHealthStatus;
 import org.opensearch.cluster.node.DiscoveryNode;
@@ -80,6 +94,7 @@ import org.opensearch.transport.TransportRequest;
 import org.opensearch.transport.TransportRequestHandler;
 import org.opensearch.transport.TransportResponseHandler;
 import org.opensearch.transport.TransportService;
+import org.opensearch.transport.client.Client;
 
 public class ConfigSyncService extends AbstractLifecycleComponent {
     private static final Logger logger = LogManager.getLogger(ConfigSyncService.class);
@@ -167,7 +182,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         index = INDEX_SETTING.get(settings);
         configPath = CONFIG_PATH_SETTING.get(settings);
         if (configPath.length() == 0) {
-            configPath = env.configFile().toFile().getAbsolutePath();
+            configPath = env.configDir().toFile().getAbsolutePath();
         }
         scrollForUpdate = SCROLL_TIME_SETTING.get(settings);
         sizeForUpdate = SCROLL_SIZE_SETTING.get(settings);
