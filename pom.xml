@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.codelibs.opensearch</groupId>
 	<artifactId>opensearch-configsync</artifactId>
-	<version>3.1.0-SNAPSHOT</version>
+	<version>3.1.0</version>
 	<packaging>jar</packaging>
 	<description>This plugin synchronizes OpenSearch configuration files across nodes, enabling consistent settings and secure, automated updates in distributed environments.</description>
 	<inceptionYear>2011</inceptionYear>
@@ -33,7 +33,7 @@
 		<connection>scm:git:git@github.com:codelibs/opensearch-configsync.git</connection>
 		<developerConnection>scm:git:git@github.com:codelibs/opensearch-configsync.git</developerConnection>
 		<url>git@github.com:codelibs/opensearch-configsync.git</url>
-	  <tag>HEAD</tag>
+	  <tag>opensearch-configsync-3.1.0</tag>
   </scm>
 	<properties>
 		<opensearch.version>3.1.0</opensearch.version>
