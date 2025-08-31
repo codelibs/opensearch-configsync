@@ -145,9 +145,6 @@ The built plugin will be available in `target/releases/`.
 ```bash
 # Unit tests
 mvn test
-
-# Integration tests (requires running OpenSearch on port 9201)
-scripts/test.sh
 ```
 
 ### Release
