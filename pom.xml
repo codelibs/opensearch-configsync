@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.codelibs.opensearch</groupId>
 	<artifactId>opensearch-configsync</artifactId>
-	<version>3.2.1-SNAPSHOT</version>
+	<version>3.3.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<description>This plugin synchronizes OpenSearch configuration files across nodes, enabling consistent settings and secure, automated updates in distributed environments.</description>
 	<inceptionYear>2011</inceptionYear>
@@ -36,8 +36,8 @@
 	  <tag>HEAD</tag>
   </scm>
 	<properties>
-		<opensearch.version>3.2.0</opensearch.version>
-		<opensearch.runner.version>3.2.0.0</opensearch.runner.version>
+		<opensearch.version>3.3.0</opensearch.version>
+		<opensearch.runner.version>3.3.0.0</opensearch.runner.version>
 		<opensearch.plugin.classname>org.codelibs.opensearch.configsync.ConfigSyncPlugin</opensearch.plugin.classname>
 		<maven.compiler.target>21</maven.compiler.target>
 		<log4j.version>2.21.0</log4j.version>
