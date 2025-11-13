@@ -46,14 +46,11 @@ import static org.mockito.Mockito.*;
 public class ConfigSyncPluginUnitTest extends TestCase {
 
     private ConfigSyncPlugin plugin;
-    private ConfigSyncService mockConfigSyncService;
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         plugin = new ConfigSyncPlugin();
-        mockConfigSyncService = mock(ConfigSyncService.class);
-        plugin.pluginComponent.setConfigSyncService(mockConfigSyncService);
     }
 
     public void test_plugin_is_instance_of_plugin() {
@@ -69,6 +66,11 @@ public class ConfigSyncPluginUnitTest extends TestCase {
     }
 
     public void test_getRestHandlers_returns_four_handlers() {
+        // Create a plugin component and set up the service
+        ConfigSyncPlugin.PluginComponent pluginComponent = new ConfigSyncPlugin.PluginComponent();
+        ConfigSyncService mockConfigSyncService = mock(ConfigSyncService.class);
+        pluginComponent.setConfigSyncService(mockConfigSyncService);
+
         Settings settings = Settings.EMPTY;
         RestController restController = mock(RestController.class);
         ClusterSettings clusterSettings = mock(ClusterSettings.class);
