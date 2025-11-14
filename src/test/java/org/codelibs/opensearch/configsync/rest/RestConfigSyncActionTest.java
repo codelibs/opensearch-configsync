@@ -16,6 +16,7 @@
 package org.codelibs.opensearch.configsync.rest;
 
 import org.opensearch.OpenSearchException;
+import org.opensearch.common.bytes.BytesArray;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
@@ -43,15 +44,21 @@ public class RestConfigSyncActionTest extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         action = new TestRestConfigSyncAction();
-        mockChannel = mock(RestChannel.class);
+        mockChannel = mock(RestChannel.class, RETURNS_DEEP_STUBS);
         mockRequest = mock(RestRequest.class);
         // Use RETURNS_SELF to make the builder fluent
         mockBuilder = mock(XContentBuilder.class, RETURNS_SELF);
 
         // BytesRestResponse constructor calls these methods on channel
-        when(mockChannel.request()).thenReturn(mockRequest);
-        when(mockChannel.newErrorBuilder()).thenReturn(mockBuilder);
-        when(mockChannel.detailedErrorsEnabled()).thenReturn(false);
+        lenient().when(mockChannel.request()).thenReturn(mockRequest);
+        lenient().when(mockChannel.newErrorBuilder()).thenReturn(mockBuilder);
+        lenient().when(mockChannel.detailedErrorsEnabled()).thenReturn(false);
+
+        // Mock builder methods that return non-builder values
+        lenient().when(mockBuilder.bytes()).thenReturn(new BytesArray("{}"));
+
+        // Allow sendResponse to be called without issues
+        lenient().doNothing().when(mockChannel).sendResponse(any(BytesRestResponse.class));
     }
 
     public void test_instance_of_base_rest_handler() {
