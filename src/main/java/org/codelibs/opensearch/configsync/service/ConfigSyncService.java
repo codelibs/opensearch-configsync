@@ -336,8 +336,9 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
     private static void copyIndex(final Client client, final String oldIndex, final String newIndex) {
         logger.info("Copy from {} to {}", oldIndex, newIndex);
         final String timeout = "1m";
-        SearchResponse searchResponse =
-                client.prepareSearch(oldIndex).setScroll(timeout).setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(timeout);
+        final int scrollSize = 100;
+        SearchResponse searchResponse = client.prepareSearch(oldIndex).setScroll(timeout).setSize(scrollSize)
+                .setQuery(QueryBuilders.matchAllQuery()).execute().actionGet(timeout);
         String scrollId = searchResponse.getScrollId();
         try {
             while (scrollId != null) {
@@ -360,10 +361,6 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
                 }
 
                 searchResponse = client.prepareSearchScroll(scrollId).setScroll(timeout).execute().actionGet(timeout);
-                if (!scrollId.equals(searchResponse.getScrollId())) {
-                    client.prepareClearScroll().addScrollId(scrollId)
-                            .execute(wrap(res -> {}, e -> logger.warn("Failed to clear the scroll context.", e)));
-                }
                 scrollId = searchResponse.getScrollId();
             }
         } catch (Exception e) {
@@ -649,6 +646,8 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
 
         private ActionListener<Void> listener;
 
+        private volatile String currentScrollId;
+
         public void execute(final ActionListener<Void> listener) {
             this.listener = listener;
 
@@ -664,12 +663,26 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
             terminated.set(true);
         }
 
+        private void clearScroll(final String scrollId) {
+            if (scrollId != null) {
+                client().prepareClearScroll().addScrollId(scrollId)
+                        .execute(wrap(res -> {
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("Cleared scroll context: {}", scrollId);
+                            }
+                        }, e -> logger.warn("Failed to clear the scroll context.", e)));
+            }
+        }
+
         @Override
         public void onResponse(final SearchResponse response) {
+            currentScrollId = response.getScrollId();
+
             if (terminated.get()) {
                 if (logger.isDebugEnabled()) {
                     logger.debug("Terminated {}", this);
                 }
+                clearScroll(currentScrollId);
                 listener.onFailure(new OpenSearchException("Config Writing process was terminated."));
                 return;
             }
@@ -677,19 +690,20 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
             final SearchHits searchHits = response.getHits();
             final SearchHit[] hits = searchHits.getHits();
             if (hits.length == 0) {
+                clearScroll(currentScrollId);
                 listener.onResponse(null);
             } else {
                 for (final SearchHit hit : hits) {
                     final Map<String, Object> source = hit.getSourceAsMap();
                     updateConfigFile(source);
                 }
-                final String scrollId = response.getScrollId();
-                client().prepareSearchScroll(scrollId).setScroll(scrollForUpdate).execute(this);
+                client().prepareSearchScroll(currentScrollId).setScroll(scrollForUpdate).execute(this);
             }
         }
 
         @Override
         public void onFailure(final Exception e) {
+            clearScroll(currentScrollId);
             listener.onFailure(e);
         }
     }
