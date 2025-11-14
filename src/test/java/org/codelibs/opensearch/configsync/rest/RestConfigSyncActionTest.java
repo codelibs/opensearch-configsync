@@ -45,17 +45,13 @@ public class RestConfigSyncActionTest extends TestCase {
         action = new TestRestConfigSyncAction();
         mockChannel = mock(RestChannel.class);
         mockRequest = mock(RestRequest.class);
-        mockBuilder = mock(XContentBuilder.class);
+        // Use RETURNS_SELF to make the builder fluent
+        mockBuilder = mock(XContentBuilder.class, RETURNS_SELF);
 
         // BytesRestResponse constructor calls these methods on channel
         when(mockChannel.request()).thenReturn(mockRequest);
         when(mockChannel.newErrorBuilder()).thenReturn(mockBuilder);
         when(mockChannel.detailedErrorsEnabled()).thenReturn(false);
-
-        // Mock XContentBuilder methods that might be called
-        when(mockBuilder.startObject()).thenReturn(mockBuilder);
-        when(mockBuilder.endObject()).thenReturn(mockBuilder);
-        when(mockBuilder.field(anyString(), any(Object.class))).thenReturn(mockBuilder);
     }
 
     public void test_instance_of_base_rest_handler() {
