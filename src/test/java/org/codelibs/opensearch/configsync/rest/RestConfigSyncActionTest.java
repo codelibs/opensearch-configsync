@@ -16,6 +16,7 @@
 package org.codelibs.opensearch.configsync.rest;
 
 import org.opensearch.OpenSearchException;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestChannel;
@@ -36,6 +37,7 @@ public class RestConfigSyncActionTest extends TestCase {
     private TestRestConfigSyncAction action;
     private RestChannel mockChannel;
     private RestRequest mockRequest;
+    private XContentBuilder mockBuilder;
 
     @Override
     protected void setUp() throws Exception {
@@ -43,9 +45,17 @@ public class RestConfigSyncActionTest extends TestCase {
         action = new TestRestConfigSyncAction();
         mockChannel = mock(RestChannel.class);
         mockRequest = mock(RestRequest.class);
+        mockBuilder = mock(XContentBuilder.class);
 
-        // BytesRestResponse constructor calls channel.request()
+        // BytesRestResponse constructor calls these methods on channel
         when(mockChannel.request()).thenReturn(mockRequest);
+        when(mockChannel.newErrorBuilder()).thenReturn(mockBuilder);
+        when(mockChannel.detailedErrorsEnabled()).thenReturn(false);
+
+        // Mock XContentBuilder methods that might be called
+        when(mockBuilder.startObject()).thenReturn(mockBuilder);
+        when(mockBuilder.endObject()).thenReturn(mockBuilder);
+        when(mockBuilder.field(anyString(), any())).thenReturn(mockBuilder);
     }
 
     public void test_instance_of_base_rest_handler() {
