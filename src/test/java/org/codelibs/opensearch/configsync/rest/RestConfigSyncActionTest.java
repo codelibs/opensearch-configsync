@@ -35,12 +35,17 @@ public class RestConfigSyncActionTest extends TestCase {
 
     private TestRestConfigSyncAction action;
     private RestChannel mockChannel;
+    private RestRequest mockRequest;
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         action = new TestRestConfigSyncAction();
         mockChannel = mock(RestChannel.class);
+        mockRequest = mock(RestRequest.class);
+
+        // BytesRestResponse constructor calls channel.request()
+        when(mockChannel.request()).thenReturn(mockRequest);
     }
 
     public void test_instance_of_base_rest_handler() {
@@ -88,9 +93,9 @@ public class RestConfigSyncActionTest extends TestCase {
         verify(mockChannel, times(1)).sendResponse(any(BytesRestResponse.class));
     }
 
-    public void test_sendErrorResponse_when_channel_throws_exception() throws IOException {
+    public void test_sendErrorResponse_when_channel_throws_exception() {
         Exception exception = new RuntimeException("Test exception");
-        doThrow(new IOException("Channel error")).when(mockChannel).sendResponse(any(BytesRestResponse.class));
+        doThrow(new RuntimeException("Channel error")).when(mockChannel).sendResponse(any(BytesRestResponse.class));
 
         // Should not throw an exception, but log the error
         action.sendErrorResponse(mockChannel, exception);
