@@ -16,7 +16,7 @@
 package org.codelibs.opensearch.configsync.rest;
 
 import org.opensearch.OpenSearchException;
-import org.opensearch.common.bytes.BytesArray;
+import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
@@ -27,6 +27,7 @@ import org.opensearch.transport.client.node.NodeClient;
 import junit.framework.TestCase;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +56,7 @@ public class RestConfigSyncActionTest extends TestCase {
         lenient().when(mockChannel.detailedErrorsEnabled()).thenReturn(false);
 
         // Mock builder methods that return non-builder values
-        lenient().when(mockBuilder.bytes()).thenReturn(new BytesArray("{}"));
+        lenient().when(mockBuilder.bytes()).thenReturn(new BytesArray("{}".getBytes(StandardCharsets.UTF_8)));
 
         // Allow sendResponse to be called without issues
         lenient().doNothing().when(mockChannel).sendResponse(any(BytesRestResponse.class));
