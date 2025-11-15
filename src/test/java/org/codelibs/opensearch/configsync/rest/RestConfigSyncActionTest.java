@@ -56,7 +56,7 @@ public class RestConfigSyncActionTest extends TestCase {
         lenient().when(mockChannel.detailedErrorsEnabled()).thenReturn(false);
 
         // Mock builder methods that return non-builder values
-        lenient().when(mockBuilder.bytes()).thenReturn(new BytesArray("{}".getBytes(StandardCharsets.UTF_8)));
+        lenient().when(mockBuilder.toBytesReference()).thenReturn(new BytesArray("{}".getBytes(StandardCharsets.UTF_8)));
 
         // Allow sendResponse to be called without issues
         lenient().doNothing().when(mockChannel).sendResponse(any(BytesRestResponse.class));
