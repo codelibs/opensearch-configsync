@@ -21,9 +21,6 @@
 		<dependencySet>
 			<useProjectArtifact>true</useProjectArtifact>
 			<useTransitiveFiltering>true</useTransitiveFiltering>
-			<excludes>
-				<exclude>org.codelibs.opensearch:opensearch-engine-server</exclude>
-			</excludes>
 		</dependencySet>
 	</dependencySets>
 </assembly>
