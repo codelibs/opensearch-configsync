@@ -60,7 +60,7 @@ public class ConfigSyncPluginTest extends TestCase {
                 settingsBuilder.put("http.cors.enabled", true);
                 settingsBuilder.put("http.cors.allow-origin", "*");
                 settingsBuilder.putList("discovery.seed_hosts", "127.0.0.1:9301");
-                settingsBuilder.putList("cluster.initial_master_nodes", "127.0.0.1:9301");
+                settingsBuilder.putList("cluster.initial_cluster_manager_nodes", "127.0.0.1:9301");
                 settingsBuilder.put("configsync.flush_interval", flushInterval);
                 if (fileUpdaterEnabled != null) {
                     settingsBuilder.put("configsync.file_updater.enabled", fileUpdaterEnabled.booleanValue());
