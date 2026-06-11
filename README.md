@@ -20,7 +20,7 @@ The OpenSearch Config Sync Plugin provides seamless distribution and synchroniza
 
 | Plugin Version | OpenSearch Version | Java Version |
 |---------------|--------------------|--------------|
-| 3.2.x         | 3.2.0+            | 21+          |
+| 3.7.x         | 3.7.0+            | 21+          |
 
 ## Version History
 
@@ -33,10 +33,10 @@ Please file an [issue](https://github.com/codelibs/opensearch-configsync/issues)
 ## Installation
 
 ```bash
-$OPENSEARCH_HOME/bin/opensearch-plugin install org.codelibs.opensearch:opensearch-configsync:3.2.0
+$OPENSEARCH_HOME/bin/opensearch-plugin install org.codelibs.opensearch:opensearch-configsync:3.7.0
 ```
 
-**Note**: Replace `3.2.0` with the latest version available in the [Maven Repository](https://repo1.maven.org/maven2/org/codelibs/opensearch/opensearch-configsync/).
+**Note**: Replace `3.7.0` with the latest version available in the [Maven Repository](https://repo1.maven.org/maven2/org/codelibs/opensearch/opensearch-configsync/).
 
 ## Getting Started
 
