@@ -1,35 +1,25 @@
 # OpenSearch Config Sync Plugin
 
 [![Java CI with Maven](https://github.com/codelibs/opensearch-configsync/actions/workflows/maven.yml/badge.svg)](https://github.com/codelibs/opensearch-configsync/actions/workflows/maven.yml)
-[![Maven Central](https://img.shields.io/maven-central/v/org.codelibs.opensearch/opensearch-configsync.svg)](https://repo1.maven.org/maven2/org/codelibs/opensearch/opensearch-configsync/)
+[![Maven Central](https://img.shields.io/maven-central/v/org.codelibs.opensearch/opensearch-configsync)](https://central.sonatype.com/artifact/org.codelibs.opensearch/opensearch-configsync)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-## Overview
-
-The OpenSearch Config Sync Plugin provides seamless distribution and synchronization of configuration files (such as scripts, dictionaries, or custom settings) across all nodes in your OpenSearch cluster. This plugin ensures consistent configuration management in distributed environments through automated file synchronization.
-
-### Key Features
-
-- **Distributed File Management**: Centrally manage and distribute files across all cluster nodes
-- **Automatic Synchronization**: Files are automatically synced to all nodes at configurable intervals
-- **RESTful API**: Complete REST API for file operations (upload, download, list, delete)
-- **Secure Storage**: Files are securely stored in the `.configsync` system index
-- **Cluster-wide Operations**: Flush and reset operations across the entire cluster
-- **Real-time Updates**: Changes are propagated to all nodes without manual intervention
+OpenSearch Config Sync Plugin distributes configuration files across the nodes of
+an OpenSearch cluster. Files such as dictionaries, synonym lists and scripts are
+uploaded once through a REST API, stored in an index, and written to the
+configuration directory of every node by a scheduled updater. This removes the
+need to copy files to each node by hand or to rebuild node images whenever a
+dictionary changes.
 
 ## Compatibility
 
 | Plugin Version | OpenSearch Version | Java Version |
-|---------------|--------------------|--------------|
-| 3.8.x         | 3.8.0+            | 21+          |
-| 3.7.x         | 3.7.0+            | 21+          |
+|----------------|--------------------|--------------|
+| 3.8.x          | 3.8.0+             | 21+          |
+| 3.7.x          | 3.7.0+             | 21+          |
 
-## Version History
-
-[View all versions in Maven Repository](https://repo1.maven.org/maven2/org/codelibs/opensearch/opensearch-configsync/)
-
-### Issues/Questions
-
-Please file an [issue](https://github.com/codelibs/opensearch-configsync/issues) if you encounter any problems or have questions.
+Released versions are listed on
+[Maven Central](https://central.sonatype.com/artifact/org.codelibs.opensearch/opensearch-configsync/versions).
 
 ## Installation
 
@@ -37,129 +27,145 @@ Please file an [issue](https://github.com/codelibs/opensearch-configsync/issues)
 $OPENSEARCH_HOME/bin/opensearch-plugin install org.codelibs.opensearch:opensearch-configsync:3.8.0
 ```
 
-**Note**: Replace `3.8.0` with the latest version available in the [Maven Repository](https://repo1.maven.org/maven2/org/codelibs/opensearch/opensearch-configsync/).
+Restart the node, then confirm that the plugin is loaded:
+
+```bash
+$OPENSEARCH_HOME/bin/opensearch-plugin list
+# configsync
+```
+
+To install a locally built package instead:
+
+```bash
+mvn clean package
+$OPENSEARCH_HOME/bin/opensearch-plugin install file:target/releases/opensearch-configsync-3.8.0-SNAPSHOT.zip
+```
+
+Use `opensearch-plugin remove configsync` to uninstall.
 
 ## Getting Started
 
-### API Endpoints
-
-The plugin provides RESTful API endpoints for managing configuration files:
-
-#### Upload/Register File
-
-Upload a file to be synchronized across all cluster nodes:
+Register a file. The `path` parameter is where the file will be written on each
+node, relative to the OpenSearch configuration directory:
 
 ```bash
-curl -XPOST -H 'Content-Type:application/json' \
-  localhost:9200/_configsync/file?path=user-dict.txt \
+curl -XPOST -H 'Content-Type: application/json' \
+  'localhost:9200/_configsync/file?path=user-dict.txt' \
   --data-binary @user-dict.txt
 ```
 
-- **path**: Target file location under `$OPENSEARCH_CONF` directory (e.g., `/etc/opensearch/user-dict.txt`)
-- The file will be stored in the `.configsync` index and distributed to all nodes
-
-#### List All Files
-
-Retrieve a list of all managed configuration files:
+The file is stored in the index and picked up by every node on the next flush
+interval. To distribute it immediately:
 
 ```bash
-curl -XGET -H 'Content-Type:application/json' localhost:9200/_configsync/file
+curl -XPOST -H 'Content-Type: application/json' 'localhost:9200/_configsync/flush'
 ```
 
-**Response:**
-```json
-{"acknowledged":true,"path":["user-dict.txt"]}
-```
+## REST API
 
-#### Download File
+### `POST /_configsync/file`
 
-Retrieve a specific configuration file:
+Registers or replaces a file. The request body is the file content.
+
+| Parameter | Description |
+|-----------|-------------|
+| `path` | Destination path relative to the OpenSearch configuration directory. |
+
+### `GET /_configsync/file`
+
+With `path`, returns the content of that file. Without it, returns the list of
+registered paths.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `path` | none | Return the content of this file instead of the list. |
+| `sort` | `path` | Sort key for the list, as `field` or `field:order`. |
+| `fields` | all | Comma-separated fields to return for each entry. |
+| `from` | `0` | Offset into the list. |
+| `size` | `10` | Number of entries to return. |
 
 ```bash
-curl -XGET -H 'Content-Type:application/json' \
-  localhost:9200/_configsync/file?path=user-dict.txt
+curl -XGET 'localhost:9200/_configsync/file'
+# {"acknowledged":true,"path":["user-dict.txt"]}
+
+curl -XGET 'localhost:9200/_configsync/file?path=user-dict.txt'
 ```
 
-Returns the file content as stored in the `.configsync` index.
+### `DELETE /_configsync/file`
 
-#### Delete File
+Removes a file from the index. Copies already written to the nodes are left in
+place.
 
-Remove a file from synchronization:
+| Parameter | Description |
+|-----------|-------------|
+| `path` | Path of the file to remove. |
 
-```bash
-curl -XDELETE -H 'Content-Type:application/json' \
-  localhost:9200/_configsync/file?path=user-dict.txt
-```
+### `POST /_configsync/flush`
 
-This removes the file from the `.configsync` index, but does not delete existing files on nodes.
+Writes the registered files to every node immediately, without waiting for the
+next scheduled run.
 
-### Additional Operations
+### `POST /_configsync/reset`
 
-#### Force Flush
+Restarts the synchronization scheduler on every node. Useful after changing
+`configsync.flush_interval` at runtime.
 
-Force immediate synchronization across all nodes:
+### `GET /_configsync/wait`
 
-```bash
-curl -XPOST -H 'Content-Type:application/json' localhost:9200/_configsync/flush
-```
+Blocks until the config sync index reaches the requested health status. Intended
+for startup scripts that must not proceed until the plugin is ready.
 
-#### Reset Synchronization
-
-Restart the synchronization scheduler:
-
-```bash
-curl -XPOST -H 'Content-Type:application/json' localhost:9200/_configsync/reset
-```
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `status` | `yellow` | Cluster health status to wait for. |
+| `timeout` | `30s` | Maximum time to wait. |
 
 ## Configuration
 
-### Automatic Synchronization
-
-Files are automatically synchronized from the `.configsync` index at regular intervals. Configure the sync interval in your OpenSearch configuration file:
+Set these in `opensearch.yml`:
 
 ```yaml
-# opensearch.yml
-configsync.flush_interval: 1m  # Default: 1 minute
+configsync.flush_interval: 1m
 ```
 
-### Available Settings
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `configsync.flush_interval` | `1m` | Interval between synchronization runs. Can be updated through the cluster settings API. |
+| `configsync.file_updater.enabled` | `true` | Whether this node writes synchronized files to disk. Set to `false` on nodes that should only serve the API. |
+| `configsync.config_path` | OpenSearch config directory | Directory the `path` parameter is resolved against. |
+| `configsync.index` | `configsync` | Index used to store the files. |
+| `configsync.scroll_size` | `1` | Number of files fetched per scroll request during a run. |
+| `configsync.scroll_time` | `1m` | Scroll timeout used during a run. |
+| `configsync.xpack.security.user` | none | `user:password` credentials sent as HTTP Basic authorization when the cluster requires authentication. |
 
-- `configsync.flush_interval`: Interval for automatic file synchronization (default: `1m`)
-- `configsync.file_updater.enabled`: Enable/disable the file updater (default: `true`)
-- `configsync.scroll_size`: Number of files to process in each scroll request (default: `1000`)
-- `configsync.scroll_time`: Scroll timeout for file processing (default: `1m`)
-- `configsync.config_path`: Custom path for configuration files (default: OpenSearch config directory)
-- `configsync.index`: Custom index name for storing files (default: `.configsync`)
+The plugin also registers `.configsync` as a system index.
 
-## Development
+## Building from Source
 
-### Building the Plugin
+Java 21 and Maven 3.6 or later are required.
 
 ```bash
-mvn package
+git clone https://github.com/codelibs/opensearch-configsync.git
+cd opensearch-configsync
+mvn clean package
 ```
 
-The built plugin will be available in `target/releases/`.
-
-### Running Tests
+The plugin package is written to `target/releases/`.
 
 ```bash
-# Unit tests
-mvn test
+mvn test              # run the test suite
+mvn license:check     # verify license headers
+mvn license:format    # apply license headers
 ```
-
-### Release
-
-```bash
-mvn release:prepare
-mvn release:perform
-```
-
-## License
-
-This project is licensed under the Apache Software License, Version 2.0.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+Issues and pull requests are welcome at
+[github.com/codelibs/opensearch-configsync](https://github.com/codelibs/opensearch-configsync).
+Please add tests for behaviour changes, keep the Apache License 2.0 headers in
+place, and make sure `mvn test` and `mvn license:check` pass before opening a pull
+request.
 
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
