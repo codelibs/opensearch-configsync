@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import org.apache.commons.codec.binary.Base64;
@@ -142,7 +143,15 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
 
     private final int sizeForUpdate;
 
-    private Date lastChecked = new Date(0);
+    /**
+     * How far before the start of a completed updater run the next run begins. A file's
+     * {@code @timestamp} is taken before the file is indexed, and on the node that received it,
+     * so a file can become searchable only after a run that started later than its timestamp.
+     */
+    private static final long UPDATER_LOOKBACK_MILLIS = TimeValue.timeValueMinutes(5).millis();
+
+    /** Lower bound of the next updater run; advanced only by the updater, after a run completes. */
+    private final AtomicLong lastChecked = new AtomicLong(0L);
 
     private ConfigFileUpdater configFileUpdater;
 
@@ -629,7 +638,11 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
                 logger.debug("Processing ConfigFileUpdater.");
             }
 
-            writer.execute(wrap(response -> startUpdater(), e -> {
+            final long startTime = System.currentTimeMillis();
+            writer.execute(lastChecked.get(), wrap(response -> {
+                lastChecked.accumulateAndGet(startTime - UPDATER_LOOKBACK_MILLIS, Math::max);
+                startUpdater();
+            }, e -> {
                 logger.error("Failed to process ConfigFileUpdater.", e);
                 startUpdater();
             }));
@@ -648,13 +661,16 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
 
         private volatile String currentScrollId;
 
-        public void execute(final ActionListener<Void> listener) {
+        /**
+         * Writes every stored file whose timestamp is at or after {@code from} and is newer than the file on disk.
+         *
+         * @param from the lower bound of {@code @timestamp}, in milliseconds since the epoch
+         * @param listener notified once every matching file has been processed
+         */
+        public void execute(final long from, final ActionListener<Void> listener) {
             this.listener = listener;
 
-            final Date now = new Date();
-            final QueryBuilder queryBuilder =
-                    QueryBuilders.boolQuery().filter(QueryBuilders.rangeQuery(TIMESTAMP).from(lastChecked.getTime()));
-            lastChecked = now;
+            final QueryBuilder queryBuilder = QueryBuilders.boolQuery().filter(QueryBuilders.rangeQuery(TIMESTAMP).from(from));
             client().prepareSearch(index).setQuery(queryBuilder).setScroll(scrollForUpdate).setSize(sizeForUpdate)
                     .execute(this);
         }
@@ -712,7 +728,9 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
 
         @Override
         public void messageReceived(final FileFlushRequest request, final TransportChannel channel, final Task task) throws Exception {
-            new ConfigFileWriter().execute(wrap(response -> {
+            // Read every stored file: the caller expects the files it stored before this request on disk when the
+            // request returns, and a lower bound taken from another run can be past files that run has not written yet.
+            new ConfigFileWriter().execute(0L, wrap(response -> {
                 try {
                     channel.sendResponse(new FileFlushResponse(true));
                 } catch (final IOException e) {

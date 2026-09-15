@@ -24,13 +24,18 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CyclicBarrier;
 
 import org.codelibs.curl.CurlResponse;
 import org.codelibs.opensearch.runner.OpenSearchRunner;
 import org.codelibs.opensearch.runner.net.OpenSearchCurl;
 import org.opensearch.action.admin.cluster.settings.ClusterUpdateSettingsResponse;
+import org.opensearch.action.support.WriteRequest.RefreshPolicy;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.settings.Settings.Builder;
 import org.opensearch.node.Node;
@@ -491,6 +496,125 @@ public class ConfigSyncPluginTest extends TestCase {
             Map<String, Object> contentMap = response.getContent(OpenSearchCurl.jsonParser());
             assertEquals("true", contentMap.get("acknowledged").toString());
             assertEquals("not_found", contentMap.get("result").toString());
+        }
+    }
+
+    public void test_configFiles_concurrentFlush() throws Exception {
+        // the updater creates the index at startup but does not run within this test, so only flushes write files
+        setupClusterRunnder(null, "1h");
+
+        final int numOfClients = 3;
+        final int numOfFiles = 50;
+        final List<String> errors = new CopyOnWriteArrayList<>();
+        for (int round = 0; round < 3; round++) {
+            final CyclicBarrier barrier = new CyclicBarrier(numOfClients);
+            final Thread[] clients = new Thread[numOfClients];
+            for (int c = 0; c < numOfClients; c++) {
+                final String prefix = "round" + round + "/client" + c;
+                final Node node = runner.getNode(c % numOfNode);
+                clients[c] = new Thread(() -> {
+                    try {
+                        barrier.await();
+                        for (int f = 0; f < numOfFiles; f++) {
+                            try (CurlResponse response = OpenSearchCurl.post(node, "/_configsync/file")
+                                    .header("Content-Type", "application/json").param("path", prefix + "/file" + f + ".txt")
+                                    .body(prefix + "/file" + f).execute()) {
+                                assertEquals(response.getContentAsString(), 200, response.getHttpStatusCode());
+                            }
+                        }
+                        try (CurlResponse response =
+                                OpenSearchCurl.post(node, "/_configsync/flush").header("Content-Type", "application/json").execute()) {
+                            assertEquals(response.getContentAsString(), 200, response.getHttpStatusCode());
+                        }
+                        // every file this client stored must be on every node once its own flush has returned
+                        for (int i = 0; i < numOfNode; i++) {
+                            final File confPath = new File(runner.getNode(i).settings().get("path.home"), "config");
+                            int missing = 0;
+                            int different = 0;
+                            for (int f = 0; f < numOfFiles; f++) {
+                                final File file = new File(confPath, prefix + "/file" + f + ".txt");
+                                if (!file.exists()) {
+                                    missing++;
+                                } else if (!(prefix + "/file" + f).equals(new String(getText(file), StandardCharsets.UTF_8))) {
+                                    different++;
+                                }
+                            }
+                            if (missing > 0 || different > 0) {
+                                errors.add(prefix + ": " + missing + " missing and " + different + " different of " + numOfFiles
+                                        + " files on node " + i);
+                            }
+                        }
+                    } catch (final Throwable t) {
+                        errors.add(prefix + ": " + t);
+                    }
+                });
+                clients[c].start();
+            }
+            for (final Thread client : clients) {
+                client.join();
+            }
+        }
+        assertTrue(errors.toString(), errors.isEmpty());
+    }
+
+    public void test_configFiles_storedBeforeUpdaterRun() throws Exception {
+        setupClusterRunnder(null, "1s");
+
+        Node node = runner.node();
+
+        // start the updater on every node now, including a node still waiting to retry its start
+        try (CurlResponse response = OpenSearchCurl.post(node, "/_configsync/reset").header("Content-Type", "application/json").execute()) {
+            Map<String, Object> contentMap = response.getContent(OpenSearchCurl.jsonParser());
+            assertEquals("true", contentMap.get("acknowledged").toString());
+        }
+
+        final long storedAt = System.currentTimeMillis();
+
+        try (CurlResponse response = OpenSearchCurl.post(node, "/_configsync/file").header("Content-Type", "application/json")
+                .param("path", "test1.txt").body("Test1").execute()) {
+            Map<String, Object> contentMap = response.getContent(OpenSearchCurl.jsonParser());
+            assertEquals("true", contentMap.get("acknowledged").toString());
+        }
+
+        for (int i = 0; i < numOfNode; i++) {
+            final File file = new File(new File(runner.getNode(i).settings().get("path.home"), "config"), "test1.txt");
+            for (int j = 0; j < 30 && !file.exists(); j++) {
+                Thread.sleep(500L);
+            }
+            assertTrue(file.getAbsolutePath(), file.exists());
+        }
+
+        // let every node finish an updater run that started after storedAt
+        Thread.sleep(3000L);
+
+        // A file whose @timestamp predates those runs, but which only becomes searchable now, as when
+        // indexing a stored file takes longer than the updater takes to start its next run.
+        final byte[] content = "Test2".getBytes(StandardCharsets.UTF_8);
+        final Map<String, Object> source = new HashMap<>();
+        source.put("path", "test2.txt");
+        source.put("content", content);
+        source.put("@timestamp", new Date(storedAt));
+        node.client().prepareIndex(INDEX_NAME).setId(Base64.getUrlEncoder().withoutPadding().encodeToString(
+                "test2.txt".getBytes(StandardCharsets.UTF_8))).setSource(source).setRefreshPolicy(RefreshPolicy.IMMEDIATE).execute()
+                .actionGet();
+
+        configFiles = new File[numOfNode];
+        for (int i = 0; i < numOfNode; i++) {
+            configFiles[i] = new File(new File(runner.getNode(i).settings().get("path.home"), "config"), "test2.txt");
+        }
+        for (int j = 0; j < 20; j++) {
+            boolean written = true;
+            for (File file : configFiles) {
+                written &= file.exists();
+            }
+            if (written) {
+                break;
+            }
+            Thread.sleep(500L);
+        }
+        for (int i = 0; i < numOfNode; i++) {
+            assertTrue(configFiles[i].getAbsolutePath(), configFiles[i].exists());
+            assertEquals("Test2", new String(getText(configFiles[i])));
         }
     }
 
