@@ -52,9 +52,15 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 
+/** OpenSearch plugin that synchronizes configuration files across all nodes through a system index. */
 public class ConfigSyncPlugin extends Plugin implements ActionPlugin, SystemIndexPlugin {
 
     private final PluginComponent pluginComponent = new PluginComponent();
+
+    /** Creates the plugin. */
+    public ConfigSyncPlugin() {
+        super();
+    }
 
     @Override
     public List<RestHandler> getRestHandlers(final Settings settings, final RestController restController, final ClusterSettings clusterSettings,
@@ -105,13 +111,29 @@ public class ConfigSyncPlugin extends Plugin implements ActionPlugin, SystemInde
         return Collections.unmodifiableList(Arrays.asList(new SystemIndexDescriptor(".configsync", "Contains config sync data")));
     }
 
+    /** Holder that passes the {@link ConfigSyncService} created by the node to the REST handlers. */
     public static class PluginComponent {
         private ConfigSyncService configSyncService;
 
+        /** Creates an empty holder. */
+        public PluginComponent() {
+            super();
+        }
+
+        /**
+         * Returns the service.
+         *
+         * @return the service, or {@code null} if it has not been created yet
+         */
         public ConfigSyncService getConfigSyncService() {
             return configSyncService;
         }
 
+        /**
+         * Sets the service.
+         *
+         * @param configSyncService the service
+         */
         public void setConfigSyncService(final ConfigSyncService configSyncService) {
             this.configSyncService = configSyncService;
         }

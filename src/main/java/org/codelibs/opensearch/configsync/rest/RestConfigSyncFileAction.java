@@ -43,10 +43,18 @@ import org.opensearch.search.lookup.SourceLookup;
 import org.opensearch.search.sort.SortOrder;
 import org.opensearch.transport.client.node.NodeClient;
 
+/** Handles the {@code /_configsync/file} endpoints (upload, download, list and delete). */
 public class RestConfigSyncFileAction extends RestConfigSyncAction {
 
     private final ConfigSyncService configSyncService;
 
+    /**
+     * Creates a handler.
+     *
+     * @param settings the node settings
+     * @param controller the REST controller
+     * @param configSyncService the service that executes the operations
+     */
     @Inject
     public RestConfigSyncFileAction(final Settings settings, final RestController controller, final ConfigSyncService configSyncService) {
         this.configSyncService = configSyncService;

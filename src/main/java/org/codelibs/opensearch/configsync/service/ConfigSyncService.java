@@ -97,38 +97,51 @@ import org.opensearch.transport.TransportResponseHandler;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
+/** Service that stores config files in a system index and writes them to the local filesystem of each node. */
 public class ConfigSyncService extends AbstractLifecycleComponent {
     private static final Logger logger = LogManager.getLogger(ConfigSyncService.class);
 
+    /** Setting {@code configsync.file_updater.enabled}: whether the file updater runs on the node (default: true). */
     public static final Setting<Boolean> FILE_UPDATER_ENABLED_SETTING =
             Setting.boolSetting("configsync.file_updater.enabled", true, Property.NodeScope);
 
+    /** Setting {@code configsync.flush_interval}: interval of the file updater (default: 1m, dynamic). */
     public static final Setting<TimeValue> FLUSH_INTERVAL_SETTING =
             Setting.timeSetting("configsync.flush_interval", TimeValue.timeValueMinutes(1), Property.NodeScope, Property.Dynamic);
 
+    /** Setting {@code configsync.scroll_size}: number of files per scroll request of the file updater (default: 1). */
     public static final Setting<Integer> SCROLL_SIZE_SETTING = Setting.intSetting("configsync.scroll_size", 1, Property.NodeScope);
 
+    /** Setting {@code configsync.scroll_time}: keep-alive of the scroll used by the file updater (default: 1m). */
     public static final Setting<TimeValue> SCROLL_TIME_SETTING =
             Setting.timeSetting("configsync.scroll_time", TimeValue.timeValueMinutes(1), Property.NodeScope);
 
+    /** Setting {@code configsync.config_path}: directory the files are written to (default: the OpenSearch config directory). */
     public static final Setting<String> CONFIG_PATH_SETTING = Setting.simpleString("configsync.config_path", Property.NodeScope);
 
+    /** Setting {@code configsync.index}: name of the index that stores the files (default: {@code configsync}). */
     public static final Setting<String> INDEX_SETTING =
             new Setting<>("configsync.index", s -> "configsync", Function.identity(), Property.NodeScope);
 
+    /** Setting {@code configsync.xpack.security.user}: {@code user:password} credentials sent as a Basic authorization header (default: none). */
     public static final Setting<String> XPACK_SECURITY_SETTING =
             new Setting<>("configsync.xpack.security.user", s -> "", ConfigSyncService::xpackSecurityToken, Property.NodeScope);
 
+    /** Name of the transport action that flushes the files on a node. */
     public static final String ACTION_CONFIG_FLUSH = "cluster:admin/configsync/flush";
 
+    /** Name of the transport action that resets the sync scheduler on a node. */
     public static final String ACTION_CONFIG_RESET = "cluster:admin/configsync/reset_sync";
 
     private static final String FILE_MAPPING_JSON = "configsync/file_mapping.json";
 
+    /** Field of a stored file that holds its update time. */
     public static final String TIMESTAMP = "@timestamp";
 
+    /** Field of a stored file that holds its Base64-encoded content. */
     public static final String CONTENT = "content";
 
+    /** Field of a stored file that holds its path relative to the config directory. */
     public static final String PATH = "path";
 
     private final Client client;
@@ -175,6 +188,17 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         return "Basic " + basicAuth;
     }
 
+    /**
+     * Creates the service and registers the transport handlers for flush and reset.
+     *
+     * @param settings the node settings
+     * @param client the client used to access the config index
+     * @param clusterService the cluster service
+     * @param transportService the transport service
+     * @param env the node environment
+     * @param threadPool the thread pool
+     * @param pluginComponent the holder that receives this service
+     */
     @Inject
     public ConfigSyncService(final Settings settings, final Client client, final ClusterService clusterService,
             final TransportService transportService, final Environment env, final ThreadPool threadPool,
@@ -393,6 +417,13 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
     protected void doClose() {
     }
 
+    /**
+     * Stores a file in the config index, replacing any existing file with the same path.
+     *
+     * @param path the path of the file relative to the config directory
+     * @param contentArray the content of the file
+     * @param listener the listener notified with the index response
+     */
     public void store(final String path, final byte[] contentArray, final ActionListener<IndexResponse> listener) {
         checkIfIndexExists(wrap(response -> {
             try {
@@ -410,6 +441,16 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         }, listener::onFailure));
     }
 
+    /**
+     * Lists the stored files.
+     *
+     * @param from the offset of the first result
+     * @param size the maximum number of results
+     * @param fields the fields to return; the path only if {@code null} or empty
+     * @param sortField the field to sort by
+     * @param sortOrder the sort order, {@code asc} or {@code desc}
+     * @param listener the listener notified with the matching documents
+     */
     public void getPaths(final int from, final int size, final String[] fields, final String sortField, final String sortOrder,
             final ActionListener<List<Object>> listener) {
         checkIfIndexExists(wrap(res -> {
@@ -439,6 +480,11 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         return Base64.encodeBase64URLSafeString(path.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Restarts the sync scheduler on all data nodes.
+     *
+     * @param listener the listener notified when all nodes have responded
+     */
     public void resetSync(final ActionListener<ConfigResetSyncResponse> listener) {
         checkIfIndexExists(wrap(response -> {
             final ClusterState state = clusterService.state();
@@ -502,6 +548,11 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         }
     }
 
+    /**
+     * Syncs the stored files to the local filesystem of all data nodes immediately.
+     *
+     * @param listener the listener notified when all nodes have responded
+     */
     public void flush(final ActionListener<ConfigFileFlushResponse> listener) {
         checkIfIndexExists(wrap(response -> {
             final ClusterState state = clusterService.state();
@@ -542,6 +593,12 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         }
     }
 
+    /**
+     * Returns the content of a stored file.
+     *
+     * @param path the path of the file relative to the config directory
+     * @param listener the listener notified with the content, or {@code null} if the file is not stored
+     */
     public void getContent(final String path, final ActionListener<byte[]> listener) {
         checkIfIndexExists(wrap(res -> {
             client().prepareGet(index, getId(path)).execute(wrap(response -> {
@@ -555,12 +612,25 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         }, listener::onFailure));
     }
 
+    /**
+     * Deletes a stored file from the config index.
+     *
+     * @param path the path of the file relative to the config directory
+     * @param listener the listener notified with the delete response
+     */
     public void delete(final String path, final ActionListener<DeleteResponse> listener) {
         checkIfIndexExists(
                 wrap(response -> client().prepareDelete(index, getId(path)).setRefreshPolicy(RefreshPolicy.IMMEDIATE).execute(listener),
                         listener::onFailure));
     }
 
+    /**
+     * Waits for the config index to reach a health status.
+     *
+     * @param waitForStatus the status to wait for
+     * @param timeout the maximum time to wait
+     * @param listener the listener notified with the cluster health response
+     */
     public void waitForStatus(final String waitForStatus, final String timeout, final ActionListener<ClusterHealthResponse> listener) {
         try {
             client.admin().cluster().prepareHealth(index).setWaitForStatus(ClusterHealthStatus.fromString(waitForStatus))
@@ -747,6 +817,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         }
     }
 
+    /** Transport request that asks a node to flush its files. */
     public static class FileFlushRequest extends TransportRequest {
         FileFlushRequest() {
             super();
@@ -788,6 +859,7 @@ public class ConfigSyncService extends AbstractLifecycleComponent {
         }
     }
 
+    /** Transport request that asks a node to reset its sync scheduler. */
     public static class ResetSyncRequest extends TransportRequest {
         ResetSyncRequest() {
             super();
