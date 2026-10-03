@@ -17,7 +17,13 @@ package org.codelibs.opensearch.configsync.action;
 
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 
+/** Response of a cluster-wide sync reset request. */
 public class ConfigResetSyncResponse extends AcknowledgedResponse {
+    /**
+     * Creates a response.
+     *
+     * @param acknowledged whether the request was acknowledged
+     */
     public ConfigResetSyncResponse(final boolean acknowledged) {
         super(acknowledged);
     }

@@ -17,7 +17,13 @@ package org.codelibs.opensearch.configsync.action;
 
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 
+/** Response of a cluster-wide config file flush request. */
 public class ConfigFileFlushResponse extends AcknowledgedResponse {
+    /**
+     * Creates a response.
+     *
+     * @param acknowledged whether the request was acknowledged
+     */
     public ConfigFileFlushResponse(final boolean acknowledged) {
         super(acknowledged);
     }

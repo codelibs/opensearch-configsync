@@ -31,10 +31,18 @@ import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.transport.client.node.NodeClient;
 
+/** Handles the {@code /_configsync/wait} endpoint, which waits for the config index to reach a status. */
 public class RestConfigSyncWaitAction extends RestConfigSyncAction {
 
     private final ConfigSyncService configSyncService;
 
+    /**
+     * Creates a handler.
+     *
+     * @param settings the node settings
+     * @param controller the REST controller
+     * @param configSyncService the service that executes the operations
+     */
     @Inject
     public RestConfigSyncWaitAction(final Settings settings, final RestController controller,
             final ConfigSyncService configSyncService) {

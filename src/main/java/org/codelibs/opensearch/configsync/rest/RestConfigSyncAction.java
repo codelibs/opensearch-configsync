@@ -29,10 +29,23 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestChannel;
 
+/** Base class of the config sync REST handlers. */
 public abstract class RestConfigSyncAction extends BaseRestHandler {
 
+    /** Logger of the concrete handler class. */
     protected Logger logger = LogManager.getLogger(getClass());
 
+    /** Creates a handler. */
+    protected RestConfigSyncAction() {
+        super();
+    }
+
+    /**
+     * Sends an acknowledged response.
+     *
+     * @param channel the channel to respond on
+     * @param params additional fields of the response body, or {@code null}
+     */
     protected void sendResponse(final RestChannel channel, final Map<String, Object> params) {
         try {
             final XContentBuilder builder = JsonXContent.contentBuilder();
@@ -50,6 +63,12 @@ public abstract class RestConfigSyncAction extends BaseRestHandler {
         }
     }
 
+    /**
+     * Sends an error response.
+     *
+     * @param channel the channel to respond on
+     * @param e the failure to report
+     */
     protected void sendErrorResponse(final RestChannel channel, final Exception e) {
         try {
             channel.sendResponse(new BytesRestResponse(channel, e));
