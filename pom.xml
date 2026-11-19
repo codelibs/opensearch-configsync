@@ -36,8 +36,8 @@
 	  <tag>HEAD</tag>
   </scm>
 	<properties>
-		<opensearch.version>3.9.0</opensearch.version>
-		<opensearch.runner.version>3.9.0.0</opensearch.runner.version>
+		<opensearch.version>3.10.0</opensearch.version>
+		<opensearch.runner.version>3.10.0.0</opensearch.runner.version>
 		<opensearch.plugin.classname>org.codelibs.opensearch.configsync.ConfigSyncPlugin</opensearch.plugin.classname>
 		<maven.compiler.target>21</maven.compiler.target>
 		<log4j.version>2.25.5</log4j.version>
